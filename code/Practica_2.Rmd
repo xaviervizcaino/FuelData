@@ -1,0 +1,58 @@
+---
+title: "PRACTICA - 2"
+author: "Autor"
+date: '`r format(Sys.Date(),"%e de %B, %Y")`'
+output:
+  pdf_document: 
+    toc: yes
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_libraries, include=FALSE}
+library(tidyverse)
+library(ggpubr)
+library(cowplot)
+library(stats)
+library(agricolae)
+
+
+
+library(knitr)
+```
+
+```{r general, include=FALSE}
+mypalette<-c("#F8766D","#00BFC4","#7CAE00","#C77CFF","#D89000" )
+```
+
+## 1. Lectura del fitxer i preparació de les dades
+
+Llegim el fitxer amb opcions.
+
+```{r}
+#data <- read.csv("../data/FuelScraper/dataset.csv")
+
+data <- read.csv("D:/10_UOC/S3_M2.951 - Tipologia i cicle de vida de les dades/PRACTICA_2/Documents de treball/FuelData/data/FuelScraper/dataset.csv", encoding="UTF-8", sep=";")
+```
+Canviem variables a factors
+
+```{r}
+#Vector de variables a modificar
+t_vector<-c("Province","Road_side","Sale_1", "Sale_2", "Fuel_type")
+
+#Loop
+for (i in t_vector){
+  #Canvi de tipus a factor
+  data[,i]<-as.factor(data[,i])
+}
+```
+
+Canviem variables temporals
+
+```{r}
+data$Capture_date<-as.Date(data$Capture_date, format = "%Y/%m/%d")
+data$Update_date<-as.Date(data$Update_date, format = "%d/%m/%Y")
+```
