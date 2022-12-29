@@ -14,6 +14,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r load_libraries, include=FALSE}
 library(tidyverse)
+library(stringdist)
+
 library(ggpubr)
 library(cowplot)
 library(stats)
@@ -30,13 +32,17 @@ mypalette<-c("#F8766D","#00BFC4","#7CAE00","#C77CFF","#D89000" )
 
 ## 1. Lectura del fitxer i preparació de les dades
 
+```{r, include=FALSE}
+wd<-getwd()
+datadir<-paste(dirname(wd), "data", sep="/")
+```
+
 Llegim el fitxer amb opcions.
 
 ```{r}
-#data <- read.csv("../data/FuelScraper/dataset.csv")
-
-data <- read.csv("D:/10_UOC/S3_M2.951 - Tipologia i cicle de vida de les dades/PRACTICA_2/Documents de treball/FuelData/data/FuelScraper/dataset.csv", encoding="UTF-8", sep=";")
+fueldata <- read.csv(paste(datadir, "FuelScraper", "dataset.csv", sep = "/"), encoding="UTF-8", sep=";")
 ```
+
 Canviem variables a factors
 
 ```{r}
@@ -46,13 +52,204 @@ t_vector<-c("Province","Road_side","Sale_1", "Sale_2", "Fuel_type")
 #Loop
 for (i in t_vector){
   #Canvi de tipus a factor
-  data[,i]<-as.factor(data[,i])
+  fueldata[,i]<-as.factor(fueldata[,i])
 }
 ```
 
 Canviem variables temporals
 
 ```{r}
-data$Capture_date<-as.Date(data$Capture_date, format = "%Y/%m/%d")
-data$Update_date<-as.Date(data$Update_date, format = "%d/%m/%Y")
+fueldata$Capture_date<-as.Date(fueldata$Capture_date, format = "%Y/%m/%d")
+fueldata$Update_date<-as.Date(fueldata$Update_date, format = "%d/%m/%Y")
+fueldata$Capture_time<-lubridate::hms(fueldata$Capture_time)
+```
+
+Seleccionem les dades del dia 16 de Novembre
+
+```{r}
+fueldata<-fueldata[fueldata$Capture_date == as.Date("2022/11/16", format ="%Y/%m/%d"),]
+```
+
+Llegim fitxers de població per municipis
+
+```{r}
+pobdata <- read.csv(paste(datadir, "pobmun", "pobmun22.csv", sep = "/"), encoding="UTF-8", sep=";")
+```
+
+Canviem noms de variables i dades a majúscules per a posteriors comparacions
+
+```{r}
+names(pobdata)[names(pobdata) == "PROVINCIA"] <- "Province"
+names(pobdata)[names(pobdata) == "NOMBRE"] <- "City"
+names(pobdata)[names(pobdata) == "CPRO"] <- "P_code"
+names(pobdata)[names(pobdata) == "CMUN"] <- "C_code"
+names(pobdata)[names(pobdata) == "POB22"] <- "Population"
+names(pobdata)[names(pobdata) == "HOMBRES"] <- "P_Male"
+names(pobdata)[names(pobdata) == "MUJERES"] <- "P_Female"
+
+pobdata$Province<-toupper(pobdata$Province)
+pobdata$City<-toupper(pobdata$City)
+```
+
+Canviem tipus de dades de les variables "chr" per tal de normalitzar paraules amb accent en ambdos datasets
+
+```{r}
+fueldata$Province<-iconv(fueldata$Province, from = 'UTF-8', to = 'ASCII//TRANSLIT')
+fueldata$City<-iconv(fueldata$City, from = 'UTF-8', to = 'ASCII//TRANSLIT')
+pobdata$Province<-iconv(pobdata$Province, from = 'UTF-8', to = 'ASCII//TRANSLIT')
+pobdata$City<-iconv(pobdata$City, from = 'UTF-8', to = 'ASCII//TRANSLIT')
+```
+
+```{r}
+fueldata[fueldata$Province=="ALICANTE","Province"]<-"ALICANTE/ALACANT"
+fueldata[fueldata$Province=="VALENCIA / VALENCIA","Province"]<-"VALENCIA/VALENCIA"
+fueldata[fueldata$Province=="CASTELLON / CASTELLO","Province"]<-"CASTELLON/CASTELLO"
+```
+
+Normalitzar l'ús d'articles en els camps Province i City utilitzant RegEx.
+
+```{r}
+fueldata$Province<-sub("(\\w+) \\((\\w+)\\)","\\1, \\2",fueldata$Province, fixed=FALSE)
+fueldata$City<-sub("((\\w| )+) \\(((\\w|')+)\\)","\\1, \\3",fueldata$City, fixed=FALSE)
+```
+
+Canvis individuals
+
+```{r}
+fueldata[fueldata$Province=="ALBACETE" & fueldata$City=="CHINCHILLA DE MONTE-ARAGO","City"]<-"CHINCHILLA DE MONTE-ARAGON"
+fueldata[fueldata$Province=="ALICANTE/ALACANT" & fueldata$City=="BENITACHELL","City"]<-"BENITACHELL/POBLE NOU DE BENITATXELL, EL"
+fueldata[fueldata$Province=="ALICANTE/ALACANT" & fueldata$City=="ALTEA LA VELLA","City"]<-"ALTEA"
+fueldata[fueldata$Province=="ALICANTE/ALACANT" & fueldata$City=="CALPE","City"]<-"CALP"
+fueldata[fueldata$Province=="ALICANTE/ALACANT" & fueldata$City=="HONDON DE LAS NIEVES","City"]<-"FONDO DE LES NEUS, EL/HONDON DE LAS NIEVES"
+fueldata[fueldata$Province=="ALICANTE/ALACANT" & fueldata$City=="MONOVAR","City"]<-"MONOVAR/MONOVER"
+fueldata[fueldata$Province=="ALICANTE/ALACANT" & fueldata$City=="MURO DEL ALCOY","City"]<-"MURO DE ALCOY"
+fueldata[fueldata$Province=="ALICANTE/ALACANT" & fueldata$City=="ORIHUELA - COSTA, NUCLEO","City"]<-"ORIHUELA"
+fueldata[fueldata$Province=="ALICANTE/ALACANT" & fueldata$City=="PINOSO","City"]<-"PINOS, EL/PINOSO"
+fueldata[fueldata$Province=="ALICANTE/ALACANT" & fueldata$City=="VILLAJOYOSA / VILA JOIOSA, LA","City"]<-"VILLAJOYOSA/VILA JOIOSA, LA"
+fueldata[fueldata$Province=="ALICANTE/ALACANT" & fueldata$City=="XIXONA","City"]<-"JIJONA/XIXONA"
+fueldata[fueldata$Province=="AVILA" & fueldata$City=="MADRIGAL ALTAS TORRES","City"]<-"MADRIGAL DE LAS ALTAS TORRES"
+fueldata[fueldata$Province=="AVILA" & fueldata$City=="SANTA M DE LOS CABALLEROS","City"]<-"SANTA MARIA DE LOS CABALLEROS"
+fueldata[fueldata$Province=="BADAJOZ" & fueldata$City=="VALENCIA MOMBUEY","City"]<-"VALENCIA DEL MOMBUEY"
+fueldata[fueldata$Province=="BARCELONA" & fueldata$City=="MONTCADA CENTRE","City"]<-"MONTCADA I REIXAC"
+fueldata[fueldata$Province=="BARCELONA" & fueldata$City=="MONTORNES CENTRE","City"]<-"MONTORNES DEL VALLES"
+fueldata[fueldata$Province=="BARCELONA" & fueldata$City=="MONTORNES NORD","City"]<-"MONTORNES DEL VALLES"
+fueldata[fueldata$Province=="BARCELONA" & fueldata$City=="PALMA DE CERVELLO","City"]<-"PALMA DE CERVELLO, LA"
+fueldata[fueldata$Province=="BARCELONA" & fueldata$City=="POBLE SEC","City"]<-"BARCELONA"
+fueldata[fueldata$Province=="BARCELONA" & fueldata$City=="PONT VILOMARA I ROCAFORT","City"]<-"PONT DE VILOMARA I ROCAFORT, EL"
+fueldata[fueldata$Province=="BARCELONA" & fueldata$City=="SANT FOST CAMPSENTELLES","City"]<-"SANT FOST DE CAMPSENTELLES"
+fueldata[fueldata$Province=="BARCELONA" & fueldata$City=="SANT SALVADOR GUARDIOLA","City"]<-"SANT SALVADOR DE GUARDIOLA"
+fueldata[fueldata$Province=="BARCELONA" & fueldata$City=="SANTA MARGARIDA MONTBUI","City"]<-"SANTA MARGARIDA DE MONTBUI"
+fueldata[fueldata$Province=="BARCELONA" & fueldata$City=="TEIA CENTRE","City"]<-"TEIA"
+fueldata[fueldata$Province=="BIZKAIA" & fueldata$City=="ABADINO-ZELAIETA","City"]<-"ABADINO"
+fueldata[fueldata$Province=="BIZKAIA" & fueldata$City=="ABANTO","City"]<-"ABANTO Y CIERVANA-ABANTO ZIERBENAA"
+fueldata[fueldata$Province=="BIZKAIA" & fueldata$City=="AMOREBIETA","City"]<-"AMOREBIETA-ETXANO"
+fueldata[fueldata$Province=="BIZKAIA" & fueldata$City=="BERRIZ-OLAKUETA","City"]<-"BERRIZ"
+fueldata[fueldata$Province=="BIZKAIA" & fueldata$City=="ORDUNA","City"]<-"URDUNA/ORDUNA"
+fueldata[fueldata$Province=="BIZKAIA" & fueldata$City=="IZURZA","City"]<-"IZURTZA"
+fueldata[fueldata$Province=="BURGOS" & fueldata$City=="HUERTA DEL REY","City"]<-"HUERTA DE REY"
+fueldata[fueldata$Province=="CADIZ" & fueldata$City=="LINEA LA CONCEPCION, LA","City"]<-"LINEA DE LA CONCEPCION, LA"
+fueldata[fueldata$Province=="CADIZ" & fueldata$City=="MEDINA-SIDONIA", "City"]<-"MEDINA SIDONIA"
+fueldata[fueldata$Province=="CANTABRIA" & fueldata$City=="CASTRO URDIALES","City"]<-"CASTRO-URDIALES"
+fueldata[fueldata$Province=="CANTABRIA" & fueldata$City=="CORRALES, LOS","City"]<-"CORRALES DE BUELNA, LOS"
+fueldata[fueldata$Province=="CANTABRIA" & fueldata$City=="LOS CORRALES DE BUELNA","City"]<-"CORRALES DE BUELNA, LOS"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="ALCORA","City"]<-"ALCORA, L'"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="ALMAZORA","City"]<-"ALMASSORA"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="ALQUERIAS DEL NINO PERDIDO","City"]<-"ALQUERIES, LES/ALQUERIAS DEL NINO PERDIDO"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="BENASAL","City"]<-"BENASSAL"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="BENICASIM","City"]<-"BENICASIM/BENICASSIM"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="BENLLOCH","City"]<-"BENLLOC"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="BURRIANA","City"]<-"BORRIANA/BURRIANA"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="CASTELLON DE LA PLANA","City"]<-"CASTELLO DE LA PLANA"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="CHILCHES","City"]<-"CHILCHES/XILXES"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="LUCENA DEL CID","City"]<-"LLUCENA/LUCENA DEL CID"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="OROPESA","City"]<-"OROPESA DEL MAR/ORPESA"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="PENISCOLA","City"]<-"PENISCOLA/PENISCOLA"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="VILLAFRANCA DEL CID","City"]<-"VILAFRANCA/VILLAFRANCA DEL CID"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="VILLARREAL","City"]<-"VILA-REAL"
+fueldata[fueldata$Province=="CASTELLON/CASTELLO" & fueldata$City=="VISTABELLA DEL MAESTRAZGO","City"]<-"VISTABELLA DEL MAESTRAT"
+fueldata[fueldata$Province=="CIUDAD REAL" & fueldata$City=="VILLANUEVA LOS INFANTES","City"]<-"VILLANUEVA DE LOS INFANTES"
+fueldata[fueldata$Province=="CORDOBA" & fueldata$City=="FERNAN NUNEZ","City"]<-"FERNAN-NUNEZ"
+fueldata[fueldata$Province=="CORDOBA" & fueldata$City=="VALENZUELA Y LLANADAS","City"]<-"VALENZUELA"
+fueldata[fueldata$Province=="CORUNA, A" & fueldata$City=="BETANZOS-O-VELLO","City"]<-"BETANZOS"
+fueldata[fueldata$Province=="CORUNA, A" & fueldata$City=="LARACHA","City"]<-"LARACHA, A"
+fueldata[fueldata$Province=="CORUNA, A" & fueldata$City=="OROSO PEQUENO","City"]<-"OROSO"
+fueldata[fueldata$Province=="CORUNA, A" & fueldata$City=="POBRA DO CARAMINAL","City"]<-"POBRA DO CARAMINAL, A"
+fueldata[fueldata$Province=="CORUNA, A" & fueldata$City=="PONTES DE GARCIA RODRIGUEZ, AS (SANTA MARIA)","City"]<-"PONTES DE GARCIA RODRIGUEZ, AS"
+fueldata[fueldata$Province=="GIPUZKOA" & fueldata$City=="DONOSTIA-SAN SEBASTIAN","City"]<-"DONOSTIA/SAN SEBASTIAN"
+fueldata[fueldata$Province=="GIPUZKOA" & fueldata$City=="LASARTE","City"]<-"LASARTE-ORIA"
+fueldata[fueldata$Province=="GIRONA" & fueldata$City=="BISBAL D'EMPORDA(LA)","City"]<-"BISBAL D'EMPORDA, LA"
+fueldata[fueldata$Province=="GIRONA" & fueldata$City=="BRUNYOLA","City"]<-"BRUNYOLA I SANT MARTI SAPRESA"
+fueldata[fueldata$Province=="GIRONA" & fueldata$City=="CALONGE","City"]<-"CALONGE I SANT ANTONI"
+fueldata[fueldata$Province=="GIRONA" & fueldata$City=="CASTELL D'ARO","City"]<-"CASTELL-PLATJA D'ARO"
+fueldata[fueldata$Province=="GIRONA" & fueldata$City=="LA JONQUERA","City"]<-"JONQUERA, LA"
+fueldata[fueldata$Province=="GIRONA" & fueldata$City=="LES PLANES D'HOSTOLES","City"]<-"PLANES D'HOSTOLES, LES"
+fueldata[fueldata$Province=="GIRONA" & fueldata$City=="PEDRET","City"]<-"PEDRET I MARZA"
+fueldata[fueldata$Province=="GIRONA" & fueldata$City=="PLATJA D'ARO","City"]<-"CASTELL-PLATJA D'ARO"
+fueldata[fueldata$Province=="GIRONA" & fueldata$City=="ST JOAN DE LES ABADESSES","City"]<-"SANT JOAN DE LES ABADESSES"
+fueldata[fueldata$Province=="GIRONA" & fueldata$City=="TOSSA","City"]<-"TOSSA DE MAR"
+fueldata[fueldata$Province=="GRANADA" & fueldata$City=="GUEJAR-SIERRA","City"]<-"GUEJAR SIERRA"
+fueldata[fueldata$Province=="GRANADA" & fueldata$City=="HUETOR-SANTILLAN","City"]<-"HUETOR DE SANTILLAN"
+fueldata[fueldata$Province=="GRANADA" & fueldata$City=="HUETOR-TAJAR","City"]<-"HUETOR TAJAR"
+fueldata[fueldata$Province=="GRANADA" & fueldata$City=="HUETOR-VEGA","City"]<-"HUETOR VEGA"
+fueldata[fueldata$Province=="GRANADA" & fueldata$City=="PINOS-PUENTE","City"]<-"PINOS PUENTE"
+fueldata[fueldata$Province=="GUADALAJARA" & fueldata$City=="MOLINA","City"]<-"MOLINA DE ARAGON"
+fueldata[fueldata$Province=="HUELVA" & fueldata$City=="ISLA-CRISTINA","City"]<-"ISLA CRISTINA"
+fueldata[fueldata$Province=="HUELVA" & fueldata$City=="VILLANUEVA CASTILLEJOS","City"]<-"VILLANUEVA DE LOS CASTILLEJOS"
+fueldata[fueldata$Province=="HUESCA" & fueldata$City=="AINSA","City"]<-"AINSA-SOBRARBE"
+fueldata[fueldata$Province=="HUESCA" & fueldata$City=="CANFRANC-ESTACION","City"]<-"CANFRANC"
+fueldata[fueldata$Province=="HUESCA" & fueldata$City=="ESTOPINAN","City"]<-"ESTOPINAN DEL CASTILLO"
+fueldata[fueldata$Province=="JAEN" & fueldata$City=="BEDMAR","City"]<-"BEDMAR Y GARCIEZ"
+fueldata[fueldata$Province=="LLEIDA" & fueldata$City=="GIMENELLS","City"]<-"GIMENELLS I EL PLA DE LA FONT"
+fueldata[fueldata$Province=="LLEIDA" & fueldata$City=="MONTFERRER","City"]<-"MONTFERRER I CASTELLBO"
+fueldata[fueldata$Province=="LLEIDA" & fueldata$City=="PRATS","City"]<-"PRATS I SANSOR"
+fueldata[fueldata$Province=="LLEIDA" & fueldata$City=="VIELHA","City"]<-"VIELHA E MIJARAN"
+fueldata[fueldata$Province=="LUGO" & fueldata$City=="BARREIROS (CASCO URBANO)","City"]<-"BARREIROS"
+fueldata[fueldata$Province=="LUGO" & fueldata$City=="LOURENZA (CASCO URBANO)","City"]<-"LOURENZA"
+fueldata[fueldata$Province=="LUGO" & fueldata$City=="PASTORIZA","City"]<-"PASTORIZA, A"
+
+fueldata[fueldata$Province=="LUGO" & fueldata$City=="PASTORIZA","City"]<-"PASTORIZA, A"
+
+```
+
+Combinem els dos dataframes
+
+```{r}
+total<-merge(fueldata, pobdata, by=c("Province", "City"), all = TRUE)
+```
+
+
+
+```{r}
+a<-total[is.na(total$Capture_date),]
+b<-total[!is.na(total$Capture_date) & is.na(total$P_code),]
+c<-b %>% summarise(Province, City) %>% distinct()
+```
+
+
+
+
+
+
+
+```{r}
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+a<-filter(data, Fuel_type=="Gasóleo A habitual")
+boxplot(a$Price)
 ```
