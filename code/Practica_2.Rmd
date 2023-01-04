@@ -33,7 +33,9 @@ mypalette<-c("#F8766D","#00BFC4","#7CAE00","#C77CFF","#D89000" )
 
 ## 1. Descripció del dataset
 
-Per a la realització d'aquesta segona pràctica s'utilitza el *dataset* generat a la primera pràctica, i es combina amb altres *datasets* que resultin d'interès, per poder realitzar un anàlisis més profund, tenint en compte factors socioeconòmics.
+Per a la realització d'aquesta segona pràctica s'utilitza el *dataset* generat a la primera pràctica, i es combina amb altres *datasets* que resultin d'interès, per poder realitzar un anàlisi més profund, tenint en compte factors socioeconòmics.
+
+Com a recordatori; el conjunt de dades extret en la PRACTICA_1 conté la informació (general i de preu) de totes les estacions de servei d’Espanya obtinguda en cinc dies consecutius, del 14/11/2022 al 18/11/2022 ambdós inclosos. Per a cada execució de *web scraping* (diària), es van extreure les dades de totes les estacions de servei a totes les províncies d’Espanya i per a tots els tipus de carburants disponibles en la pàgina.
 
 Per a la correcta execució del *script* és imprescindible definir la ruta on es troba l'arxiu **Practica_2.Rmd** com a *working directory*.
 
@@ -42,15 +44,17 @@ wd<-getwd()
 datadir<-paste(dirname(wd), "data", sep="/")
 ```
 
-A continuació procedeix a la lectura de l'arxiu de dades amb opcions, escollint el separador i el tipus de codificació.
+A continuació es procedeix a la lectura de l'arxiu de dades amb opcions, escollint el separador i el tipus de codificació.
 
 ```{r}
+#Importar arxiu
 fueldata <- read.csv(paste(datadir, "FuelScraper", "dataset.csv", sep = "/"), 
                      encoding="UTF-8", sep=";")
+#Visualitzar summary de dades
 summary(fueldata)
 ```
 
-El primer anàlisi del dataset indica que pot ser interessant canviar algunes dades a tipus factor, així com canviar el format de les variables temporals.
+El primer anàlisi del *dataset* indica que pot ser interessant canviar algunes dades a tipus factor, així com canviar el format de les variables temporals.
 
 ```{r}
 #Vector de variables a modificar
@@ -64,23 +68,26 @@ for (i in t_vector){
 ```
 
 ```{r}
+#Canvis en variables temporals
 fueldata$Capture_date<-as.Date(fueldata$Capture_date, format = "%Y/%m/%d")
 fueldata$Update_date<-as.Date(fueldata$Update_date, format = "%d/%m/%Y")
 fueldata$Capture_time<-lubridate::hms(fueldata$Capture_time)
 ```
 
-Com a darrer pas en la càrrega del *dataset* original es generen variables de *backup* per a *Province* i *City* ja que aquestes posteriorment s'hauran de modificar a través de processos de normalització de noms per tal de fer-les compatibles amb les dades dels altres *datasets* a integrar.
+Com a darrer pas en el procés de càrrega del *dataset* original es generen variables de *backup* per a *Province* i *City* ja que aquestes posteriorment s'hauran de modificar a través de processos de normalització de noms per tal de fer-les compatibles amb les dades dels altres *datasets* que es volen integrar.
 
 ```{r}
+#Creació de variables de backup
 fueldata$bckup.Province<-fueldata$Province
 fueldata$bckup.City<-fueldata$City
 ```
 
 ## 2. Integració i selecció
 
-Amb l'objectiu d'obtenir un *dataset* amb més informació integrada, es llegeix un arxiu addicional amb el cens de població per municipis. Aquesta informació es extreta de l'Institut Nacional d'Estadística (INE). En aquest cas, la lectura també es realitza amb opcions.
+Amb l'objectiu d'obtenir un *dataset* amb més informació que permeti generar més valor, es llegeix un arxiu addicional amb el cens de població per municipis. Aquesta informació es extreta de l'Institut Nacional d'Estadística (INE). En aquest cas, la lectura també es realitza amb opcions.
 
 ```{r}
+#Importar arxiu
 pobdata <- read.csv(paste(datadir, "pobmun", "pobmun22.csv", sep = "/"), 
                     encoding="UTF-8", sep=";")
 ```
@@ -102,9 +109,10 @@ pobdata$Province<-toupper(pobdata$Province)
 pobdata$City<-toupper(pobdata$City)
 ```
 
-També, es normalitzen les paraules en les variables *Province* i *City* dels dos datasets, eliminant accénts i caràcters especials com la *ñ*. Per fer-ho es canvia el tipus de dades d'aquestes variables de UTF-8 a ASCII.
+També, es normalitzen les paraules en les variables *Province* i *City* dels dos *datasets*, eliminant accents i caràcters especials com la *ñ*. Per fer-ho es canvia el tipus de dades d'aquestes variables de UTF-8 a ASCII.
 
 ```{r}
+#Conversió de codificació per a normalització de caracters
 fueldata$Province<-iconv(fueldata$Province, from = 'UTF-8', to = 'ASCII//TRANSLIT')
 fueldata$City<-iconv(fueldata$City, from = 'UTF-8', to = 'ASCII//TRANSLIT')
 pobdata$Province<-iconv(pobdata$Province, from = 'UTF-8', to = 'ASCII//TRANSLIT')
@@ -114,14 +122,16 @@ pobdata$City<-iconv(pobdata$City, from = 'UTF-8', to = 'ASCII//TRANSLIT')
 Es canvia la denominació de 3 províncies per tal de fer la informació compatible entre els *datasets* de preus de combustibles i de població per municipis.
 
 ```{r}
+#Canvis específics en variable província
 fueldata[fueldata$Province=="ALICANTE","Province"]<-"ALICANTE/ALACANT"
 fueldata[fueldata$Province=="VALENCIA / VALENCIA","Province"]<-"VALENCIA/VALENCIA"
 fueldata[fueldata$Province=="CASTELLON / CASTELLO","Province"]<-"CASTELLON/CASTELLO"
 ```
 
-A continuació es modifica l'ús d'articles en els camps *Province* i *City* utilitzant RegEx, també buscant la compatiblitat entre *datasets*.
+A continuació es modifica l'ús d'articles en els camps *Province* i *City* utilitzant RegEx, també buscant la compatibilitat entre *datasets*.
 
 ```{r}
+#Canvis en l'ús d'articles a través de RegEx
 fueldata$Province<-sub("(\\w+) \\((\\w+)\\)","\\1, \\2",fueldata$Province, fixed=FALSE)
 fueldata$City<-sub("((\\w| )+) \\(((\\w|')+)\\)","\\1, \\3",fueldata$City, fixed=FALSE)
 ```
@@ -129,6 +139,7 @@ fueldata$City<-sub("((\\w| )+) \\(((\\w|')+)\\)","\\1, \\3",fueldata$City, fixed
 Finalment es realitzen tot un seguit de canvis individuals (que no es mostren en la memòria, però si en el codi), per tal de maximitzar la informació disponible en el *dataset* resultant.
 
 ```{r, include=FALSE}
+#Canvis individuals
 fueldata[fueldata$Province=="ALBACETE" & fueldata$City=="CHINCHILLA DE MONTE-ARAGO","City"]<-"CHINCHILLA DE MONTE-ARAGON"
 fueldata[fueldata$Province=="ALICANTE/ALACANT" & fueldata$City=="BENITACHELL","City"]<-"BENITACHELL/POBLE NOU DE BENITATXELL, EL"
 fueldata[fueldata$Province=="ALICANTE/ALACANT" & fueldata$City=="ALTEA LA VELLA","City"]<-"ALTEA"
@@ -309,17 +320,44 @@ fueldata[fueldata$Province=="ZARAGOZA" & fueldata$City=="VILLAMAYOR","City"]<-"V
 S'integren els dos *datasets* amb l'objectiu d'obtenir un únic *dataset* resultant que contingui tota la informació combinada. Aquesta integració es realitza de manera completa (all = TRUE), per tal de garantir que les dades que no tenen una parella en l'altre *dataset* es mantenen afegint *NA* en la informació.
 
 ```{r}
+#Combinació de datasets
 total<-merge(fueldata, pobdata, by=c("Province", "City"), all = TRUE)
+```
+
+De manera adicional a les tasques d'integració s'analitza la variable *Brand* específicament, convertint-la en factor i obtenint les 10 marques amb més representació.
+
+```{r}
+#Obtenció de marques mes rellevants
+total$Brand.factor<-as.factor(total$Brand)
+Brands<-as.data.frame(head(summary(total$Brand.factor),10))
+names(Brands)[1]<-"Stations"
+kable(Brands)
+```
+
+Un cop obtingudes les 10 marques amb més representació s'analitzen tots els registres per tal de normalitzar el camp marca. També per definir com a *"OTROS"* aquelles estacions de servei que no són d'una marca de les 10 més representatives.
+
+```{r}
+#Noms de les 10 marques més representatives
+Brand.names<-row.names(Brands)
+total$Brand.factor<-as.character(total$Brand.factor)
+#Iteració en les 10 marques, normalitzant nom de la marca si el conté en el string
+for (brand in Brand.names){
+  total$Brand.factor<-if_else(grepl(brand, total$Brand.factor), brand, total$Brand.factor)
+}
+#Assignació de camp "OTROS"
+total$Brand.factor<-if_else(total$Brand.factor %in% Brand.names, total$Brand.factor, "OTROS")
+total$Brand.factor<-as.factor(total$Brand.factor)
 ```
 
 Finalment, i per acabar amb les tasques de selecció es seleccionen les dades:
 
 * del dia 16 de Novembre
 * els combustibles
-  + Gasóleo A habitual
-  + Gasolina 95 E5
+  + *Gasóleo A habitual*
+  + *Gasolina 95 E5*
 
 ```{r}
+#Selecció de dades
 data<-total[total$Capture_date == as.Date("2022/11/16", format ="%Y/%m/%d"),]
 data<-data[data$Fuel_type == "Gasóleo A habitual" | data$Fuel_type == "Gasolina 95 E5",]
 ```
@@ -329,6 +367,8 @@ data<-data[data$Fuel_type == "Gasóleo A habitual" | data$Fuel_type == "Gasolina
 ### Zeros i elements buits
 
 Com a primer pas en la neteja de dades, es procedeix a eliminar tots aquells registres del *dataset* resultant on el camp *Capture_date* sigui *NA*. Aquests seran municipis que apareixen en el cens de població, però no tenen benzinera. Aquests han aparegut en el *dataset* quan s'ha realitzat l'operació de combinació plena o *FULL JOINT* en el pas anterior.
+
+NOTA: Aquest pas seria prescindible si en el moment de realitzar l'operació *merge* anterior haguessin realitzat una *LEFT JOIN* amb les opcions **all.x = TRUE**, **all.y = FALSE**, enlloc del **all = TRUE** utilitzat.
 
 ```{r}
 data<-data[!is.na(data$Capture_date),]
@@ -369,15 +409,10 @@ g1<-ggplot(data=data, aes(x=Fuel_type, y=Price, color=Fuel_type)) +
   labs(title = "Fuel price", y="Price [€/l]", x="") +
   theme(axis.text.x = element_blank(), legend.direction = "vertical", legend.position = "bottom")+
   geom_boxplot(width=0.15, color="black")
-
-#g2<-ggplot(data=data, aes(x=Fuel_type, y=Price, color=Fuel_type)) +
-#  geom_boxplot() +
-#  labs(title = "Fuel price", y="Price [€/l]") +
-#  theme(axis.text.x = element_blank(), legend.direction = "vertical", legend.position = "bottom")
 g1
 ```
 
-Observant l'existència de valors extrems s'aprofundeix en l'anàlisi, inicialment obtenint els valors característics per a cada un dels *boxplots*
+Observant l'existència de valors extrems s'aprofundeix en l'anàlisi, inicialment obtenint els valors característics del boxplot per a cada un dels combustibles seleccionats i graficats.
 
 ```{r echo=FALSE}
 st_D<-boxplot.stats(data[data$Fuel_type=="Gasóleo A habitual","Price"])
@@ -425,5 +460,75 @@ UPs<-UPs[UPs$Price.x-UPs$Price.y < round(0.8*(stt[1,3]-stt[2,3]),2),]
 data<-anti_join(data,UPs, by=c("Province", "City", "Address", "Brand"))
 ```
 
+NOTA: L'estudi d'*outliers* en l'extrem superior es podria allargar força més considerant la consistència de registres en l'horitzó tempora, considerant la consistència de registres d'una mateixa marca en una zona pròxima ...
+
+**Valors extrems inferiors**
+
+Observant el *violin plot* per al combustible *Gasóleo A habitual*, crida l'atenció la concentració de mostres al voltant del preu 1.5€/l, import que es considera "extrem". Així doncs inicialment, es seleccionen els valors per estudiar-los amb més profunditat.
+
+```{r}
+DiesConc<-data[data$Fuel_type =="Gasóleo A habitual" & 
+                 1.55>data$Price & 
+                 data$Price>1.45,] %>%
+  group_by(Province) %>%
+  summarise(n=n()) %>%
+  as.data.frame()
+kable(DiesConc)
+```
+
+On s'observa que els registres obtinguts pertanyen tots a províncies amb tipus impositius especials. Això indica, que per tal de fer un estudi coherent del preu dels combustibles s'hauran de considerar els registres de les estacions de servei peninsulars de manera separada dels registres insulars i de ciutats autònomes.
+
+```{r}
+non_peninsula=c("CEUTA", "MELILLA", "PALMAS, LAS", "SANTA CRUZ DE TENERIFE")
+data.peninsula<-data[!(data$Province %in% non_peninsula), ]
+```
+
+Graficant novament s'observa una clara reducció en el nombre de valors extrems. 
+
+```{r echo=FALSE, fig.height=5, warning=FALSE}
+g2<-ggplot(data=data.peninsula, aes(x=Fuel_type, y=Price, color=Fuel_type)) +
+  geom_violin() +
+  labs(title = "Fuel price (peninsula)", y="Price [€/l]", x="") +
+  theme(axis.text.x = element_blank(), legend.direction = "vertical", legend.position = "bottom")+
+  geom_boxplot(width=0.15, color="black")
+
+g2
+```
+
+Per finalitzar l'anàlisi dels valors extrems inferiors, es procedeix d'acord al mètode de selecció utilitzat previament en els valors extrems superiors. Així doncs, s'obtenen els registres que són valors extrems inferiors tant pel cas del combustible *Gasóleo A habitual* com pel *Gasolina 95 E5*.
+
+```{r}
+st<-boxplot.stats(data.peninsula[data.peninsula$Fuel_type=="Gasóleo A habitual","Price"])
+DiesLow<-data.peninsula[data.peninsula$Fuel_type =="Gasóleo A habitual" &
+                          data.peninsula$Price<st$stats[1],] %>%
+  group_by(Province, Brand) %>%
+  as.data.frame()
+
+st<-boxplot.stats(data.peninsula[data.peninsula$Fuel_type=="Gasolina 95 E5","Price"])
+GasLow<-data.peninsula[data.peninsula$Fuel_type =="Gasolina 95 E5" &
+                         data.peninsula$Price<st$stats[1],] %>%
+  group_by(Province, Brand) %>%
+  as.data.frame()
+```
+
+Es vol saber si els registres seleccionats com a valors extrems provenen d'estacions de servei amb una marca entre les 10 més representatives o formen part del grup "OTROS" que inclou estacions de servei de baix cost.
+
+```{r}
+st_D<-summary(DiesLow$Brand.factor)
+st_G<-summary(GasLow$Brand.factor)
+stt<-rbind(st_D,st_G)
+rownames(stt)<-c("Gasóleo A habitual","Gasolina 95 E5")
+kable(t(stt))
+```
+
+En vista dels resultats interessa analitzar amb més detall els registres per a les estacions de servei amb menors freqüència d'aparició (diferent de 0) per tractar-se de possibles errades.
+
+```{r}
+LOWs<-merge(DiesLow, GasLow, by=c("Province", "City", "Capture_date", "Address", "Brand.factor"),
+           all = TRUE)
+LOWs<-LOWs[c("Province", "City", "Address", "Brand.factor", "Fuel_type.x", "Price.x",
+           "Fuel_type.y", "Price.y")] %>%
+  arrange(Province, City, Brand.factor, Address)
+```
 
 
