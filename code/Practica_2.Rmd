@@ -532,3 +532,159 @@ LOWs<-LOWs[c("Province", "City", "Address", "Brand.factor", "Fuel_type.x", "Pric
 ```
 
 
+## 4. Anàlisi de dades
+
+
+```{r}
+install.packages("rstatix")
+library(rstatix)
+library(dplyr)
+library(stats)
+```
+
+
+```{r}
+summary(total$Price)
+```
+
+
+En primer lloc, fem un test per comprovar la diferència de mitjanes entre les ciutats
+de Barcelona i Madrid.
+Apliquem un filtre utilitzant la funció filter() per seleccionar únicament les ciutats que ens interessen. Seleccionem en primer lloc el carburant Gasoil i, seguidament, seleccionem Gasolina. D'aquesta manera veurem si hi ha diferències entre les ciutats per cada tipus de carburant.
+
+```{r}
+capital_filter <- total %>%
+  filter(Fuel_type == "Gasóleo A habitual" & (City == "BARCELONA" | City == "MADRID"))
+
+t.test(Price ~ City, data = capital_filter)
+
+capital_filter2 <- total %>%
+  filter(Fuel_type == "Gasolina 95 E5" & (City == "BARCELONA" | City == "MADRID"))
+
+t.test(Price ~ City, data = capital_filter2)
+
+```
+
+Pels dos testos el p-value és inferior a alfa, fet que fa que rebutgem la hipòtesi nul·la. Per tant, arribem a la conclusió que les diferències de preu entre les dues capitals són significatives tant per la gasolina com pel gasoil.
+
+
+
+A continuació fem un test ANOVA per veure si hi ha diferències significatives entre la mitjana de preus dels dos combustibles en funció del nombre d'habitants del municipi.
+
+
+```{r}
+pop_filter <- total %>%
+  filter(Fuel_type == "Gasóleo A habitual") %>%
+  mutate(Pop_size = ifelse(Population < 10000, "S",
+                           ifelse(Population > 100000, "L", "M")))
+pop_size_test <- aov(Price ~ Pop_size, data = pop_filter)
+summary(pop_size_test)
+```
+Com veiem, el p-valor és més petit que 0,05 i ens porta a RH0. Arribem a la conclusió
+que les diferències entre mitjanes són significatives.
+
+```{r}
+TukeyHSD(pop_size_test)
+```
+El resultat del test de Tukey mostra que les mitjanes són diferents, ja que el p-value és inferior al nivell de significació, i RH0.
+
+
+A continuació es mostra el BoxPlot pel preu del gasoil gasolina en funció de la dimensió del municipi.
+
+```{r}
+boxplot(Price ~ Pop_size, data = pop_filter, main = "BoxPlot Gasoil",
+        xlab = "Mida del municipi", ylab = "Preu")
+```
+Tornem a repetir el mateix procediment, però pel cas de la gasolina 95.
+
+```{r}
+pop_filter_fuel <- total %>%
+  filter(Fuel_type == "Gasolina 95 E5") %>%
+  mutate(Pop_size = ifelse(Population < 10000, "S",
+                           ifelse(Population > 100000, "L", "M")))
+pop_size_test_fuel <- aov(Price ~ Pop_size, data = pop_filter_fuel)
+summary(pop_size_test_fuel)
+```
+
+A continuació repetim el test de Tukey, tal com hem fet pel cas del gasoil.
+
+```{r}
+TukeyHSD(pop_size_test_fuel)
+```
+Obtenim els mateixos resultats que en el cas del gasoil. Les mitjanes són diferents.
+
+```{r}
+boxplot(Price ~ Pop_size, data = pop_filter_fuel, main = "BoxPlot Gasolina 95",
+        xlab = "Mida del municipi", ylab = "Preu")
+
+```
+
+Els resultats d'aquest primer anàlis mostren que, de mitjana, el gasoil és més car que la gasolina tant per la ciutat de Barcelona com per Madrid.
+També veiem que mentre el preu del gasoil és més barat a Barcelona, el preu de la gasolina és més barat a Madrid.
+
+
+En segon lloc volem estudiar l'existència de correlació entre la variable "Price" i la variable "Population". Sospitem que poden estar correlacionades per diferents motius.
+
+Primer crearem 2 dataframes nous per facilitar el tractament i anàlisi. Aquests contenen el preu dels carburants Gasoil i Gasolina, respectivament.
+
+```{r}
+gasoil <- subset(data, Fuel_type == "Gasóleo A habitual")
+gasolina <- subset(data, Fuel_type == "Gasolina 95 E5")
+```
+
+A continuació fem un test de correlació per les dues variables.
+
+```{r}
+cor.test(gasoil$Price, gasoil$Population)
+cor.test(gasolina$Price, gasolina$Population)
+```
+
+El resultat d'aquest test de correlació mostra que no hi ha correlació entre el preu de la gasolina i el nombre d'habitants del municipi.
+
+```{r}
+plot(subset(gasoil, select = c("Price", "Population"))$Price, subset(gasoil, select = c("Price", "Population"))$Population, col = "#7CAE00", xlab = "Preu", ylab = "Població")
+points(subset(gasolina, select = c("Price", "Population"))$Price, subset(gasolina, select = c("Price", "Population"))$Population, col = "#D89000")
+abline(lm(gasoil$Price ~ gasoil$Population))
+title("Correlació Preu-Habitants pel Gasoil i Gasolina")
+```
+
+Per últim analitzarem si el nombre de gasolineres que hi ha al municipi influeix al preu del carburant. El nostre supòsit inicial és que el nombre de gasolineres ha de tenir cert impacte sobre el preu.
+
+```{r}
+mean_gasoil_city <- aggregate(gasoil$Price, by=list(gasoil$City), mean)
+gasoil_frequency <- table(gasoil$City)
+gasoil_frequency <- as.data.frame(gasoil_frequency)
+
+mean_gasolina_city <- aggregate(gasolina$Price, by=list(gasolina$City), mean)
+gasolina_frequency <- table(gasolina$City)
+gasolina_frequency <- as.data.frame(gasolina_frequency)
+```
+
+Un cop creats els dataframes que contenen el preu mitjà dels dos tipus de carburants i la freqüència, és a dir, el nmbre de gasolineres, procedim a analitzar si existeix algun tipus de relació.
+
+```{r}
+result <- merge(mean_gasoil_city, gasoil_frequency, by.x = "Group.1", by.y = "Var1")
+result <- result %>% rename(Municipio = Group.1, Meanp = x)
+
+rg <- lm(Meanp ~ Freq, data = result)
+summary(rg)
+cor(result$Meanp, result$Freq)
+
+resultg <- merge(mean_gasolina_city, gasolina_frequency, by.x = "Group.1", by.y = "Var1")
+resultg <- resultg %>% rename(Municipio = Group.1, Meanp = x)
+
+lmg <- lm(Meanp ~ Freq, data = resultg)
+summary(lmg)
+cor(result$Meanp, result$Freq)
+```
+
+En els dos casos el p-value és menor que el nivell de significació i, per tant, podem dir que el nombre de gasolineres té cert impacte en el preu dels dos carburants.
+D'altra banda, la correlació ens indica que hi ha una relació dèbil entre ambdues variables, és a dir, que a mesura que augmenta el nombre de gasolineres, el preu disminueix lleugerament.
+
+```{r}
+pbrand <- lm(Price ~ Brand, data = total)
+summary(pbrand)
+```
+
+
+
