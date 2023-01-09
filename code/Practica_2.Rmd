@@ -573,7 +573,7 @@ Diesel<-data.peninsula[data.peninsula$Fuel_type=="Gasóleo A habitual" &
 g3<-ggplot(data=Diesel, aes(x=Brand.factor, y=Price, color=Brand.factor)) +
   geom_violin() +
   geom_point(data = D_1, size=5, color="black", shape = 2) +
-  geom_point(data = D_2, size=5, color="black", shape = 2) +
+  geom_point(data = D_2, size=5, shape = 2) +
   labs(title = "Gasóleo A price", y="Price [€/l]", x="") +
   theme(axis.text.x = element_blank(), legend.direction = "vertical",
         legend.position = "bottom")+
@@ -581,7 +581,7 @@ g3<-ggplot(data=Diesel, aes(x=Brand.factor, y=Price, color=Brand.factor)) +
 
 g3
 ```
-En vista dels resultats, es considera el valor extrem de la marca BP poc consistent, mentre que el valor extrem de la marca SHELL es manté.
+En vista dels resultats, es considera el valor extrem de la marca **BP** (marcat en negre en el gràfic) poc consistent, mentre que es considera que no hi ha prou evidència respecte el valor extrem de la marca **SHELL**.
 
 ```{r}
 #Element poc consistent a extreure
@@ -596,6 +596,7 @@ G_1<-GasLow[GasLow$Brand.factor=="CAMPSA",]
 G_2<-GasLow[GasLow$Brand.factor=="CEPSA",]
 G_3<-GasLow[GasLow$Brand.factor=="GALP",]
 G_4<-GasLow[GasLow$Brand.factor=="SHELL",]
+G_4_min<-G_4[which.min(G_4$Price),]
 Gasolina<-data.peninsula[data.peninsula$Fuel_type=="Gasolina 95 E5" &
                      (data.peninsula$Brand.factor=="CAMPSA" |
                         data.peninsula$Brand.factor=="CEPSA" |
@@ -604,10 +605,10 @@ Gasolina<-data.peninsula[data.peninsula$Fuel_type=="Gasolina 95 E5" &
 
 g4<-ggplot(data=Gasolina, aes(x=Brand.factor, y=Price, color=Brand.factor)) +
   geom_violin() +
-  geom_point(data = G_1, size=5, color="black", shape = 2) +
+  geom_point(data = G_1, size=5, shape = 2) +
   geom_point(data = G_2, size=5, color="black", shape = 2) +
-  geom_point(data = G_3, size=5, color="black", shape = 2) +
-  geom_point(data = G_4, size=5, color="black", shape = 2) +
+  geom_point(data = G_3, size=5, shape = 2) +
+  geom_point(data = G_4_min, size=5, color="black", shape = 2) +
   labs(title = "Gasolina 95 E5 price", y="Price [€/l]", x="") +
   theme(axis.text.x = element_blank(), legend.direction = "vertical",
         legend.position = "bottom")+
@@ -617,8 +618,8 @@ g4
 ```
 A la vista dels resultats, es consideren valors poc consistents:
 
-* Valor extrem inferior per la marca "CEPSA"
-* Valor extrem mínim per la marca "SHELL"
+* Valor extrem inferior per la marca **CEPSA**
+* Valor extrem mínim per la marca **SHELL**
 
 Finalment es procedeix a eliminar els valors que es consideren poc consistents.
 
