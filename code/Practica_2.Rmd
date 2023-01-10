@@ -44,17 +44,7 @@ if(!require(stats)){
 library(tidyverse)
 library(data.table)
 library(rstatix)
-#library(dplyr)
 library(stats)
-
-
-#library(ggpubr)
-#library(cowplot)
-#library(stats)
-#library(agricolae)
-
-
-
 library(knitr)
 ```
 
@@ -867,7 +857,7 @@ El codi es pot trobar en el següent repositori de GitHub:
 
 El vídeo amb l'explicació del desenvolupament es pot trobar a través del següent enllaç
 
-* Link
+* [Xavier Vizcaino](https://drive.google.com/file/d/15IT8oj29uZoooR-_hKTJgpYZXwY7k102)
 
 \newpage
 ## 9. Contribucions
