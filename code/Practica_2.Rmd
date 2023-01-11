@@ -689,14 +689,50 @@ exp_file<-file.path(exp_folder, "clean_dataset.csv")
 write.csv2(data.peninsula, file = exp_file, row.names = TRUE)
 ```
 
+
 ## 4. Anàlisi de dades
+
+### Selecció dels grups de dades
+
+L'anàlisi que durem a terme es divideix en 4 punts. En primer lloc estudiarem si hi ha diferències entre els preus dels carburants entre Barcelona i Madrid. En segon lloc analitzarem si el preu es veu influenciat pel nombre d'habitants del municipi. A continuació veurem si el nombre de gasolineres per municipi influeixen en el preu i, per últim, analitzarem si la marca de la gasolinera influeix en el preu.
 
 ```{r basic_price_analysis}
 total<-data.peninsula
 summary(total$Price)
 ```
 
-### No hauriem de fer primer els tests de normalitat i de homoscedasticitat?? <-XAVI
+
+### Comprovació de la normalitat i homoscedasticitat
+
+En primer lloc analitzem si les dades segueixen una distribució normal o no.
+```{r}
+ad.test(total$Price)
+ad.test(total$Population)
+#ks.test(total$Price, "pnorm", mean=mean(total$Price), sd=sd(total$Price))
+```
+
+###!Falten "Conclusions"!
+
+A continuació fem el test d'homoscedasticitat.
+```{r}
+#leveneTest(pnorm, Population, data = total)
+#leveneTest(pnorm ~ City, data = capital_filter)
+#levene_test(pnorm, Population, data = total)
+```
+
+
+Com que la distribució de la variable Price no segueix una normal, creem una nova columna amb el nom "pnorm" dins el dataset total, que conté els preus normalitzats.
+
+```{r}
+total <- total %>% 
+  mutate(pnorm = scale(Price))
+total <- total %>% 
+  mutate(popnorm = scale(Population))
+```
+
+
+
+### Aplicació de proves estadístiques per comparar els grups de dades
 
 En primer lloc, fem un test per comprovar la diferència de mitjanes entre les ciutats
 de Barcelona i Madrid.
@@ -706,13 +742,19 @@ Apliquem un filtre utilitzant la funció filter() per seleccionar únicament les
 capital_filter <- total %>%
   filter(Fuel_type == "Gasóleo A habitual" & (City == "BARCELONA" | City == "MADRID"))
 
-t.test(Price ~ City, data = capital_filter)
+# Test d'homoscedasticitat per comprovar diferències en la variància
+leveneTest(Price ~ City, data = capital_filter)
+
+t.test(pnorm ~ City, data = capital_filter)
 
 capital_filter2 <- total %>%
   filter(Fuel_type == "Gasolina 95 E5" & (City == "BARCELONA" | City == "MADRID"))
 
-t.test(Price ~ City, data = capital_filter2)
+# Test d'homoscedasticitat per comprovar diferències en la variància
+leveneTest(Price ~ City, data = capital_filter2)
 
+t.test(pnorm ~ City, data = capital_filter2)
+# Pels dos casos veiem que les variàncies son iguals.
 ```
 
 Pels dos testos el p-value és inferior a alfa, fet que fa que rebutgem la hipòtesi nul·la. Per tant, arribem a la conclusió que les diferències de preu entre les dues capitals són significatives tant per la gasolina com pel gasoil.
@@ -720,27 +762,28 @@ Pels dos testos el p-value és inferior a alfa, fet que fa que rebutgem la hipò
 
 
 A continuació fem un test ANOVA per veure si hi ha diferències significatives entre la mitjana de preus dels dos combustibles en funció del nombre d'habitants del municipi.
-
-
 ```{r price_S_vs_M_vs_L}
 pop_filter <- total %>%
   filter(Fuel_type == "Gasóleo A habitual") %>%
   mutate(Pop_size = ifelse(Population < 10000, "S",
                            ifelse(Population > 100000, "L", "M")))
-pop_size_test <- aov(Price ~ Pop_size, data = pop_filter)
+leveneTest(Price ~ Pop_size, data = pop_filter)
+# Es compleix la cindició d'homoscedasticitat
+pop_size_test <- aov(pnorm ~ Pop_size, data = pop_filter)
 summary(pop_size_test)
 ```
-Com veiem, el p-valor és més petit que 0,05 i ens porta a RH0. Arribem a la conclusió
-que les diferències entre mitjanes són significatives.
+Com veiem, el p-valor és més petit que 0,05 i ens porta a RH0. Per tant, arribem a la conclusió
+que la dimensió del municipi té influència sobre el preu del Gasoil A habitual.
 
+
+A continuació fem el test de Tukey:
 ```{r}
 TukeyHSD(pop_size_test)
 ```
-El resultat del test de Tukey mostra que les mitjanes són diferents, ja que el p-value és inferior al nivell de significació, i RH0.
+El resultat d'aquest test ens indica que les diferències son significatives entre els municipis petits i mitjans i petits i grans, mentre que les diferències no son significatives entre els municipis mitjans i grans.
 
 
-A continuació es mostra el BoxPlot pel preu del gasoil gasolina en funció de la dimensió del municipi.
-
+A continuació es mostra el BoxPlot pel preu del gasoil en funció de la dimensió del municipi.
 ```{r}
 boxplot(Price ~ Pop_size, data = pop_filter, main = "BoxPlot Gasoil",
         xlab = "Mida del municipi", ylab = "Preu")
@@ -752,17 +795,17 @@ pop_filter_fuel <- total %>%
   filter(Fuel_type == "Gasolina 95 E5") %>%
   mutate(Pop_size = ifelse(Population < 10000, "S",
                            ifelse(Population > 100000, "L", "M")))
-pop_size_test_fuel <- aov(Price ~ Pop_size, data = pop_filter_fuel)
-summary(pop_size_test_fuel)
+
+leveneTest(Price ~ Pop_size, data = pop_filter_fuel)
+# NO es compleix la cindició d'homoscedasticitat -> utilitzem un test no paramètric
+
+kruskal.test(pnorm ~ Pop_size, data = pop_filter_fuel)
 ```
+Com veiem, el p-valor és més petit que 0,05 i ens porta a RH0. Per tant, arribem a la conclusió
+que la dimensió dels municipis té certa influència en el preu de la Gasolina 95 E5.
 
-A continuació repetim el test de Tukey, tal com hem fet pel cas del gasoil.
 
-```{r}
-TukeyHSD(pop_size_test_fuel)
-```
-Obtenim els mateixos resultats que en el cas del gasoil. Les mitjanes són diferents.
-
+A continuació es mostra un Box-Plot per visualitzar gràficament aquestes diferències.
 ```{r}
 boxplot(Price ~ Pop_size, data = pop_filter_fuel, main = "BoxPlot Gasolina 95",
         xlab = "Mida del municipi", ylab = "Preu")
@@ -770,32 +813,14 @@ boxplot(Price ~ Pop_size, data = pop_filter_fuel, main = "BoxPlot Gasolina 95",
 ```
 
 Els resultats d'aquest primer anàlis mostren que, de mitjana, el gasoil és més car que la gasolina tant per la ciutat de Barcelona com per Madrid.
-També veiem que mentre el preu del gasoil és més barat a Barcelona, el preu de la gasolina és més barat a Madrid.
+També veiem que el preu del gasoil és més barat a Barcelona i que el preu de la gasolina és més barat a Madrid.
 
 
-En segon lloc volem estudiar l'existència de correlació entre la variable "Price" i la variable "Population". Sospitem que poden estar correlacionades per diferents motius.
 
-Primer crearem 2 dataframes nous per facilitar el tractament i anàlisi. Aquests contenen el preu dels carburants Gasoil i Gasolina, respectivament.
-
+A continuació el que volem estudiar és si el nombre de gasolineres per municipi té algun tipus d'influència en els preus del combustible.
 ```{r}
 gasoil <- subset(data, Fuel_type == "Gasóleo A habitual")
 gasolina <- subset(data, Fuel_type == "Gasolina 95 E5")
-```
-
-A continuació fem un test de correlació per les dues variables.
-
-```{r}
-cor.test(gasoil$Price, gasoil$Population)
-cor.test(gasolina$Price, gasolina$Population)
-```
-
-El resultat d'aquest test de correlació mostra que no hi ha correlació entre el preu de la gasolina i el nombre d'habitants del municipi.
-
-```{r}
-plot(subset(gasoil, select = c("Price", "Population"))$Price, subset(gasoil, select = c("Price", "Population"))$Population, col = "#7CAE00", xlab = "Preu", ylab = "Població")
-points(subset(gasolina, select = c("Price", "Population"))$Price, subset(gasolina, select = c("Price", "Population"))$Population, col = "#D89000")
-abline(lm(gasoil$Price ~ gasoil$Population))
-title("Correlació Preu-Habitants pel Gasoil i Gasolina")
 ```
 
 Per últim analitzarem si el nombre de gasolineres que hi ha al municipi influeix al preu del carburant. El nostre supòsit inicial és que el nombre de gasolineres ha de tenir cert impacte sobre el preu.
@@ -810,7 +835,7 @@ gasolina_frequency <- table(gasolina$City)
 gasolina_frequency <- as.data.frame(gasolina_frequency)
 ```
 
-Un cop creats els dataframes que contenen el preu mitjà dels dos tipus de carburants i la freqüència, és a dir, el nmbre de gasolineres, procedim a analitzar si existeix algun tipus de relació.
+Un cop creats els dataframes que contenen el preu mitjà dels dos tipus de carburants i la freqüència, és a dir, el nombre de gasolineres, procedim a analitzar si existeix algun tipus de relació.
 
 ```{r}
 result <- merge(mean_gasoil_city, gasoil_frequency, by.x = "Group.1", by.y = "Var1")
@@ -818,22 +843,87 @@ result <- result %>% rename(Municipio = Group.1, Meanp = x)
 
 rg <- lm(Meanp ~ Freq, data = result)
 summary(rg)
-cor(result$Meanp, result$Freq)
 
 resultg <- merge(mean_gasolina_city, gasolina_frequency, by.x = "Group.1", by.y = "Var1")
 resultg <- resultg %>% rename(Municipio = Group.1, Meanp = x)
 
 lmg <- lm(Meanp ~ Freq, data = resultg)
 summary(lmg)
-cor(result$Meanp, result$Freq)
 ```
+En els dos casos el p-value és menor que el nivell de significació i, per tant, podem dir que la relació entre el nombre de gasolineres i el preu de la gasolina és estadísticament significativa.
 
-En els dos casos el p-value és menor que el nivell de significació i, per tant, podem dir que el nombre de gasolineres té cert impacte en el preu dels dos carburants.
-D'altra banda, la correlació ens indica que hi ha una relació dèbil entre ambdues variables, és a dir, que a mesura que augmenta el nombre de gasolineres, el preu disminueix lleugerament.
+
+
+Per últim, analitzarem si hi ha algun tipus de relació entre el preu dels dos combustibles i la marca de la gasolinera.
+```{r}
+gasoilb <- total[total$Fuel_type == "Gasóleo A habitual",]
+pbrand <- aov(pnorm ~ Brand.factor, data = total)
+summary(pbrand)
+
+gasolinab <- total[total$Fuel_type == "Gasolina 95 E5",]
+pbrand2 <- aov(pnorm ~ Brand.factor, data = total)
+summary(pbrand2)
+```
+En aquest últim cas, el resultat dels tests és que RH0. La conclusió és que hi ha diferències estadísticament significatives en el preu de la gasolina i el gasoil en funció de la marca de la gasolinera.
+
+
+
+A continuació es presenten alguns gràfics per veure de forma visual la distribució de les dades d'aquest darrer anàlisi.
 
 ```{r}
-pbrand <- lm(Price ~ Brand.factor, data = total)
-summary(pbrand)
+gasoleo_a_habitual = total[total$Fuel_type == "Gasóleo A habitual", ]
+
+mean_price = round(mean(gasoleo_a_habitual$Price), 3)
+ggplot(data = gasoleo_a_habitual, aes(x=Price)) +
+  geom_histogram(color="black", fill="#7CAE00") +
+  labs(title = "Distribució de preus pel Gasoil A Habitual") +
+  xlab("Preu") +
+  ylab("Nombre de gasolineres")
+```
+
+
+Fem un gràfic amb les marques que tenen més de 300 gasolineres i menys de 10, per veure gràficament les diferències en els preus.
+En primer lloc grafiquem el cas del Gasoil:
+```{r}
+gasoleo_a_habitual <- total[total$Fuel_type == "Gasóleo A habitual", ]
+brand_table <- table(gasoleo_a_habitual$Brand)
+brands_gt_300 <- brand_table[brand_table > 300]
+brands_lt_10 <- brand_table[brand_table < 10]
+
+gasoleo_a_habitual$Brand_group <- ifelse(gasoleo_a_habitual$Brand %in% names(brands_gt_300), gasoleo_a_habitual$Brand, "Other")
+
+mean_price <- aggregate(Price ~ Brand_group, data = gasoleo_a_habitual, mean)
+other_mean <- round(mean(gasoleo_a_habitual[gasoleo_a_habitual$Brand %in% names(brands_lt_10), "Price"], na.rm = TRUE), 3)
+
+mean_price <- rbind(mean_price, c("Other", other_mean))
+ggplot(data = mean_price, aes(x = Brand_group, y = Price)) +
+  geom_bar(stat = "identity", color = "black", fill = "#7CAE00") +
+  ggtitle("Gasóleo A habitual Prices by Station Group") + 
+  xlab("Station Group") + 
+  ylab("Mean Price")
+#ylim(round) Falta
+
+```
+
+
+A continuació grafiquem el cas de la Gasolina 95:
+```{r}
+gasolina95 <- total[total$Fuel_type == "Gasolina 95 E5", ]
+brand_table <- table(gasolina95$Brand)
+brands_gt_300 <- brand_table[brand_table > 300]
+brands_lt_10 <- brand_table[brand_table < 10]
+gasolina95$Brand_group <- ifelse(gasolina95$Brand %in% names(brands_gt_300), gasolina95$Brand, "Other")
+
+mean_price <- aggregate(Price ~ Brand_group, data = gasolina95, mean)
+other_mean <- round(mean(gasolina95[gasolina95$Brand %in% names(brands_lt_10), "Price"], na.rm = TRUE), 3)
+
+mean_price <- rbind(mean_price, c("Other", other_mean))
+ggplot(data = mean_price, aes(x = Brand_group, y = Price)) +
+  geom_bar(stat = "identity", color = "black", fill = "#D89000") +
+  ggtitle("Preu mitjà de la Gasolina 95 per marca") + 
+  xlab("Marca") + 
+  ylab("Preu mitjà")
+  #ylim() falta round(3)
 ```
 
 ## 5. Resolució del problema
