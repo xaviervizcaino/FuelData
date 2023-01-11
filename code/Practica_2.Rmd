@@ -12,8 +12,10 @@ output:
 ---
 
 ```{r setup_1, include=FALSE}
+#Setup R-code chunks
 knitr::opts_chunk$set(echo = TRUE)
 
+#Definició vspace entre text i codi
 hook_source_def = knitr::knit_hooks$get('source')
 knitr::knit_hooks$set(source = function(x, options) {
   if (!is.null(options$vspaceecho)) {
@@ -26,6 +28,7 @@ knitr::knit_hooks$set(source = function(x, options) {
 ```
 
 ```{r installations, include=FALSE}
+#Comprovació de paquets i instal·lacions
 if(!require(tidyverse)){
   install.packages("tidyverse")
 }
@@ -41,6 +44,7 @@ if(!require(stats)){
 ```
 
 ```{r load_libraries, include=FALSE}
+#Càrrega de llibreries
 library(tidyverse)
 library(data.table)
 library(rstatix)
@@ -49,18 +53,19 @@ library(knitr)
 ```
 
 ```{r general, include=FALSE}
+#Paleta de colors pròpia per a gràfics
 mypalette<-c("#F8766D","#00BFC4","#7CAE00","#C77CFF","#D89000" )
 ```
 
 ## 1. Descripció del dataset
 
-Per a la realització d'aquesta segona pràctica s'utilitza el *dataset* generat a la primera pràctica, i es combina amb altres *datasets* d'interès, per a realitzar un anàlisi més profund.
+Per a la realització d'aquesta segona pràctica s'utilitza el *dataset* generat a la primera pràctica usant tècniques de *web scraping*. Aquest es combina amb un altre *dataset* amb l'objectiu de realitzar un anàlisi més profund i enriquidor.
 
 Com a recordatori; el conjunt de dades extret en la PRACTICA_1 conté la informació (general i de preu) de totes les estacions de servei d’Espanya obtinguda en cinc dies consecutius, del 14/11/2022 al 18/11/2022 ambdós inclosos. Per a cada execució de *web scraping* (diària), es van extreure les dades de totes les estacions de servei a totes les províncies d’Espanya i per a tots els tipus de carburants disponibles en la pàgina.
 
 > NOTA : Per a la correcta execució del *script* és imprescindible definir la ruta on es troba l'arxiu **Practica_2.Rmd** com a *working directory*.
 
-L'anàlisi de dades posterior ha de permetre donar respostes a preguntes com ara:
+Les operacions d'aquesta pràctica han de permetre donar resposta a les següents preguntes:
 
 * Les dades d'estudi es poden aplicar a tota la geografia espanyola?
 * Hi ha zones amb preus marcadament diferents de la resta?
@@ -70,21 +75,23 @@ L'anàlisi de dades posterior ha de permetre donar respostes a preguntes com ara
 * El nombre de benzineres en un municipi influeix en els preus del combustible?
 
 ```{r working_dir, include=FALSE}
+#Obtenció de variables d'entorn
 wd<-getwd()
 datadir<-file.path(dirname(wd), "data")
 ```
 
-A continuació es procedeix a la lectura de l'arxiu de dades amb opcions, escollint el separador i el tipus de codificació i a fer un primer sumari de les dades.
+El procés s'inicia amb la lectura de l'arxiu de dades; que es realitza amb les següents opcions: escollint el separador i el tipus de codificació. A continuació es fa un primer sumari de les dades.
 
 ```{r file_import, vspaceecho='10pt'}
 #Importar arxiu
 fueldata <- read.csv(file.path(datadir, "FuelScraper", "dataset.csv"), 
                      encoding="UTF-8", sep=";")
+                     
 #Visualitzar summary de dades
 summary(fueldata)
 ```
 
-Aquest primer anàlisi del *dataset* indica que pot ser interessant canviar algunes dades a tipus factor, així com canviar el format de les variables temporals.
+Aquest primer anàlisi indica que pot ser interessant canviar algunes variables a tipus factor, així com canviar el format de les variables temporals a tipus *date* i *lubridate*.
   
 ```{r factors, vspaceecho='10pt'}
 #Vector de variables a modificar
@@ -102,7 +109,7 @@ fueldata$Update_date<-as.Date(fueldata$Update_date, format = "%d/%m/%Y")
 fueldata$Capture_time<-lubridate::hms(fueldata$Capture_time)
 ```
 
-Com a darrer pas en el procés de càrrega del *dataset* original es generen variables de *backup* per a *Province* i *City* ja que aquestes posteriorment s'hauran de modificar a través de processos de normalització de noms per tal de fer-les compatibles amb les dades dels altres *datasets* que es volen integrar.
+Com a darrer pas en el procés de càrrega del *dataset* original es generen copies de *backup* per a les variables *Province* i *City*. Aquestes posteriorment s'hauran de modificar a través de processos de normalització de noms per tal de maximitzar la compatibilitat de les dades amb les dels altres *datasets* a integrar.
   
 ```{r backup_vars, vspaceecho='10pt'}
 #Creació de variables de backup
@@ -112,7 +119,7 @@ fueldata$bckup.City<-fueldata$City
 
 ## 2. Integració i selecció
 
-Amb l'objectiu d'obtenir un *dataset* amb més informació que permeti generar més valor, es llegeix un arxiu addicional amb el cens de població per municipis. Aquesta informació s'extreu de l'Institut Nacional d'Estadística (INE). En aquest cas, la lectura es realitza amb les mateixes opcions.
+Amb l'objectiu d'obtenir un *dataset* amb més informació que permeti generar més valor a través de l'anàlisi, es llegeix un arxiu addicional que conté el cens de població per municipis. Aquesta informació s'extreu del web de l'Institut Nacional d'Estadística (INE). En aquest cas, la lectura es realitza amb les mateixes opcions que el *dataset* original.
 
 \newpage
 ```{r file_import_2}
@@ -121,7 +128,7 @@ pobdata <- read.csv(file.path(datadir, "pobmun", "pobmun22.csv"),
                     encoding="UTF-8", sep=";")
 ```
 
-Es canvien els noms de les variables i es transformen les dades a majúscules per habilitar posteriors comparacions entre els dos *datasets*.
+A partir d'aquest moment s'executen un seguit d'operacions d'adaptació, principalment en les variables *Province* i *City* per tal de maximitzar la validesa del resultat de la integració. Així doncs, es canvien els noms de les variables i es transformen les dades a majúscules per habilitar posteriors comparacions entre els dos *datasets*.
 
 ```{r var_name_change, vspaceecho='10pt'}
 #Canvis de noms
@@ -138,7 +145,7 @@ pobdata$Province<-toupper(pobdata$Province)
 pobdata$City<-toupper(pobdata$City)
 ```
 
-També, es normalitzen les paraules en les variables *Province* i *City* dels dos *datasets*, eliminant accents i caràcters especials com la *ñ*. Per fer-ho es canvia el tipus de dades d'aquestes variables de UTF-8 a ASCII.
+També, es normalitzen els valors en les variables *Province* i *City* dels dos *datasets*, aquesta operació té com a objectiu eliminar accents i caràcters especials com la *ñ*. Per fer-ho es canvia el tipus de dades d'aquestes variables de UTF-8 a ASCII.
 
 ```{r char_var_code_change, vspaceecho='10pt'}
 #Conversió de codificació per a normalització de caracters
@@ -148,7 +155,7 @@ pobdata$Province<-iconv(pobdata$Province, from = 'UTF-8', to = 'ASCII//TRANSLIT'
 pobdata$City<-iconv(pobdata$City, from = 'UTF-8', to = 'ASCII//TRANSLIT')
 ```
 
-Es canvia la denominació de 3 províncies per tal de fer la informació compatible entre els *datasets* de preus de combustibles i de població per municipis.
+Es canvia la denominació de 3 províncies per tal de fer la informació compatible entre els *datasets* **fueldata** i **pobdata**.
 
 ```{r province_id, vspaceecho='10pt'}
 #Canvis específics en variable província
@@ -157,7 +164,7 @@ fueldata[fueldata$Province=="VALENCIA / VALENCIA","Province"]<-"VALENCIA/VALENCI
 fueldata[fueldata$Province=="CASTELLON / CASTELLO","Province"]<-"CASTELLON/CASTELLO"
 ```
 
-A continuació es modifica l'ús d'articles en els camps *Province* i *City* utilitzant RegEx, també buscant la compatibilitat entre *datasets*.
+A continuació es modifica l'ús d'articles en els camps *Province* i *City* utilitzant RegEx. Inicialment, en el dataset **fueldata** les provincies o municipis amb articles tenen una estructura del tipus: "nom_municipi (article)", mentre que en el dataset **pobdata** l'estructura d'aquests es del tipus "nom_municipi, article". Així doncs es realitzen canvis en el primer per a fer-lo compatible amb el segon.
 
 ```{r city_regex, vspaceecho='10pt'}
 #Canvis en l'ús d'articles a través de RegEx
@@ -165,7 +172,7 @@ fueldata$Province<-sub("(\\w+) \\((\\w+)\\)","\\1, \\2",fueldata$Province, fixed
 fueldata$City<-sub("((\\w| )+) \\(((\\w|')+)\\)","\\1, \\3",fueldata$City, fixed=FALSE)
 ```
 
-També es realitzen tot un seguit de canvis individuals (que no es mostren en la memòria, però si en el codi), per tal de maximitzar la informació disponible en el *dataset* resultant.
+També es realitzen tot un seguit de canvis individuals (que no es detallen en la memòria, però si en el codi). Aquests canvis individuals tenen com a objectius maximitzar la informació disponible en el *dataset* resultant.
 
 ```{r individuals, include=FALSE}
 #Canvis individuals
@@ -346,14 +353,14 @@ fueldata[fueldata$Province=="ZAMORA" & fueldata$City=="CORRALES","City"]<-"CORRA
 fueldata[fueldata$Province=="ZARAGOZA" & fueldata$City=="VILLAMAYOR","City"]<-"VILLAMAYOR DE GALLEGO"
 ```
 
-S'integren els dos *datasets* amb l'objectiu d'obtenir un únic *dataset* resultant que contingui tota la informació combinada. Aquesta integració es realitza de manera completa (all = TRUE), per tal de garantir que les dades que no tenen una parella en l'altre *dataset* es mantenen afegint *NA* en la informació.
+Després de tots els canvis; s'integren els dos *datasets* amb l'objectiu d'obtenir un únic *dataset* resultant que contingui tota la informació combinada. Aquesta integració es realitza de manera completa (all = TRUE), així les dades que no tenen una parella en l'altre *dataset* es mantenen en el *dataset* resultant afegint *NA* en la informació no disponible.
 
 ```{r dataset_merge, vspaceecho='10pt'}
 #Combinació de datasets
 total<-merge(fueldata, pobdata, by=c("Province", "City"), all = TRUE)
 ```
 
-De manera adicional a les tasques d'integració s'analitza la variable *Brand* específicament, convertint-la en factor i obtenint les 10 marques amb més representació.
+De manera adicional a les tasques d'integració s'analitza la variable *Brand* específicament, convertint-la en factor i reduint els seus nivells possibles a les 10 marques amb més representació.
 
 ```{r top_brands, vspaceecho='10pt'}
 #Obtenció de marques mes rellevants
@@ -363,7 +370,7 @@ names(Brands)[1]<-"Stations"
 kable(Brands)
 ```
 
-Un cop obtingudes les 10 marques amb més representació s'analitzen tots els registres per tal de normalitzar el camp marca. Es defineix com a *"OTROS"* la variable Brand d'aquelles estacions de servei que no són d'una marca de les 10 més representatives.
+S'observa que en alguns registres, la marca apareix com a *substring* en la variable *Brand*, per tant, un cop obtingudes les 10 marques amb més representació s'itera sobre tots els registres per tal de normalitzar el camp marca. També, es defineix com a *"OTROS"* la variable *Brand* de tots aquells registres on la seva marca no és una de les 10 més representatives.
 
 ```{r brand_normalization, vspaceecho='10pt'}
 #Noms de les 10 marques més representatives
@@ -382,10 +389,10 @@ total$Brand.factor<-if_else(total$Brand.factor %in% Brand.names,
 total$Brand.factor<-as.factor(total$Brand.factor)
 ```
 
-Finalment, i per acabar amb les tasques de selecció es seleccionen les dades:
+Finalment, i per acabar amb les tasques d'aquest apartat, es realitza una selecció de dades limitada a les següents característiques:
 
-* del dia 16 de Novembre
-* els combustibles
+* dades del dia 16 de Novembre
+* dades dels combustibles
   + *Gasóleo A habitual*
   + *Gasolina 95 E5*
 
@@ -399,7 +406,7 @@ data<-data[data$Fuel_type == "Gasóleo A habitual" | data$Fuel_type == "Gasolina
 
 ### Zeros i elements buits
 
-Com a primer pas en la neteja de dades, es procedeix a eliminar tots aquells registres del *dataset* resultant on el camp *Capture_date* sigui *NA*. Aquests seran municipis que apareixen en el cens de població, però no tenen benzinera. Han aparegut en el *dataset* quan s'ha realitzat l'operació de combinació plena o *FULL JOINT* en el pas anterior.
+Com a primer pas en la neteja de dades, es procedeix a eliminar tots aquells registres del *dataset* integrat on el camp *Capture_date* sigui *NA*. Aquests seran registres que no han estat capturats en la fase de *web scraping* i per tant seran municipis que apareixen en el cens de població, però no tenen estació de servei. Han aparegut en el *dataset* quan s'ha realitzat l'operació de combinació plena o *FULL JOINT* en el pas anterior.
 
 ```{r clean_na, vspaceecho='10pt'}
 #Neteja de NAs
@@ -407,11 +414,10 @@ data<-data[!is.na(data$Capture_date),]
 ```
 
 > NOTA: Aquest pas seria prescindible si en el moment de realitzar l'operació *merge* anterior haguessin realitzat una *LEFT JOIN* amb les opcions **all.x = TRUE**, **all.y = FALSE**, enlloc del **all = TRUE** utilitzat.
-  
-  
+ 
 Actualment el *dataset* conté `r nrow(data)` registres, dels quals `r nrow(data[!is.na(data$Capture_date) & is.na(data$P_code),])` són registres dels quals no se'n coneix el cens. Això representa un `r round((nrow(data[!is.na(data$Capture_date) & is.na(data$P_code),]))/(nrow(data)),2)*100`% del total de registres.
 
-Quan es procedeix a realitzar aquest mateix estudi per a cada una de les províncies amb l'objectiu d'identificar aquelles que tinguin una representació més pobre s'obté el següent gràfic en el que es marquen:
+Amb l'objectiu d'identificar les provincies amb un percentatge de registres on no es coneix el cens, es procedeix a realitzar aquest mateix estudi per a cada provincia. El resultat d'aquest estudi s'observa en el següent gràfic on s'identifiquen:
 
 * en verd, aquelles províncies amb un percentatge de NA inferior a 5%
 * en blau les províncies amb un percentatge entre 5 i 10%
@@ -437,7 +443,7 @@ p<-ggplot(data=DT, aes(x=Province, y=Population,
 p
 ```
 
-Conseqüentment, per a estudis que no considerin dades de cens per municipis, es pot utilitzar el *dataset* complert ja que aquest prové de l'operació de *scraping* i no conté zeros o valors nuls. Tanmateix, quan l'objectiu de l'estudi requereixi considerar informació del cens; per raons de representativitat, es recomana limitar l'estudi a les províncies anteriorment identificades en verd i en blau.
+En vista dels resultats, per a estudis que no considerin dades de cens per municipis, es pot utilitzar el *dataset* complert ja que aquest prové de l'operació de *scraping* i no conté zeros o valors nuls. Tanmateix, quan l'objectiu de l'estudi requereixi considerar informació del cens, es recomana limitar l'estudi a les províncies anteriorment identificades en verd i en blau, per raons de representativitat.
 
 ```{r provinces_for_population, vspaceecho='10pt'}
 #Agrupament de províncies segons NAs percent
@@ -445,10 +451,9 @@ green_province<-DT[DT$Population<5,1]
 blue_province<-DT[DT$Population>=5 & DT$Population<10,1]
 ```
 
-
 ### Valors extrems
 
-Per tal d'identificar els valors extrems es genera un *violin plot* amb un *boxplot* al interior per cada tipus de combustible. Aquest tipus de gràfic ampliat ens permet, per una banda analitzar els *outliers* a través de la visualització *boxplot*, alhora que ens permet conèixer la distribució de la població a través de la visualització *violin*. Així doncs permet, d'un cop de vista, veure si la informació aporta el *boxplot* es consistent amb la distribució de les dades.
+Per tal d'identificar visualment els valors extrems de la variable *price* es genera un *violin plot* amb un *boxplot* al interior per cada tipus de combustible. Aquesta combinació de gràfics permet; per una banda, analitzar els *outliers* a través de la visualització *boxplot*, i per altra, conèixer la distribució de la població a través de la visualització *violin*. Així doncs permet, d'un cop de vista, veure si la informació que aporta el *boxplot* es consistent amb la distribució de les dades.
 
 \vspace{10pt}
 ```{r fuel_price, echo=FALSE, fig.height=5, warning=FALSE}
@@ -461,7 +466,7 @@ g1
 ```
 
 \newpage
-Observant l'existència de valors extrems s'aprofundeix en l'anàlisi, inicialment obtenint els valors característics del boxplot per a cada un dels combustibles seleccionats i graficats.
+Observant l'existència de valors extrems s'aprofundeix en l'anàlisi; inicialment, obtenint els valors característics del boxplot per a cada un dels combustibles seleccionats i graficats.
 
 ```{r fuel_boxplot_stats, vspaceecho='10pt', echo=FALSE}
 st_D<-boxplot.stats(data[data$Fuel_type=="Gasóleo A habitual","Price"])
@@ -472,7 +477,7 @@ colnames(stt)<-c("Min", "Q1", "Med", "Q3", "Max")
 kable(stt)
 ```
 
-S'observa que la diferència de preus entre les medianes de la població *Gasóleo A habitual* i *Gasolina 95 E5* és de `r stt[1,3]-stt[2,3]`€/l, sent el combustible *Gasóleo A habitual* el més car.
+S'observa que la diferència de preus entre les medianes de la població *Gasóleo A habitual* i *Gasolina 95 E5* és de **`r stt[1,3]-stt[2,3]`€/l**, sent el combustible *Gasóleo A habitual* el més car.
 
 \vspace{10pt}
 **Valors extrems superiors** 
@@ -493,7 +498,7 @@ GasUP<-data[data$Fuel_type =="Gasolina 95 E5" & data$Price>st$stats[5],] %>%
   as.data.frame()
 ```
 
-Combinant la informació anterior, s'obté les dades de les estacions de servei on els dos combustibles es consideren *outliers*. Fet que indica que la estació de servei en general té uns preus més cars que la mitjana. 
+Combinant la informació anterior, s'obté les dades de les estacions de servei on els dos combustibles es consideren *outliers*. Fet que indica que la estació de servei en general té uns preus més cars que la mitjana, pels dos productes. 
 
 ```{r UPs_merge, vspaceecho='10pt'}
 #Combinació de valors extrems
@@ -506,9 +511,9 @@ UPs<-UPs[c("Province", "City", "Address", "Brand", "Fuel_type.x", "Price.x",
   arrange(Province, City, Brand, Address)
 ```
 
-Finalment es comprova quines estacions de servei (de les marcades com a cares) no mantenen la diferència de medianes de preus de combustibles obtinguda anteriorment. Per tal de ser una mica més flexibles, es considerarà com a límit el 80% de la diferència anterior. Per tant es seleccionen els registres on la diferència de preu entre els dos combustibles sigui inferior a `r round(0.8*(stt[1,3]-stt[2,3]),2)`€/l.
+Finalment, es comprova quines estacions de servei (de les marcades com a cares) no mantenen la diferència de medianes de preus de combustibles obtinguda anteriorment. Per tal de flexibilitzar la condició, es considerarà com a límit el 80% de la diferència de medianes. Per tant, es seleccionen els registres on la diferència de preu entre els dos combustibles sigui inferior a **`r round(0.8*(stt[1,3]-stt[2,3]),2)`€/l** per considerar que els seus valors no són prou consistents i que per tant poden contenir errades.
 
-Els registres d'aquestes estacions de servei s'eliminen de l'estudi per a ser *outliers* i no mostrar prou consistència en els seus valors, que permetin garantir que els preus no continguin errades.
+Els registres seleccionats anteriorment s'eliminen de l'estudi per a ser *outliers* i no mostrar prou consistència.
 
 ```{r inconsistent_values_remove, vspaceecho='10pt'}
 #Comprovació incosistència
@@ -518,12 +523,12 @@ UPs<-UPs[UPs$Price.x-UPs$Price.y < round(0.8*(stt[1,3]-stt[2,3]),2),]
 data<-anti_join(data,UPs, by=c("Province", "City", "Address", "Brand"))
 ```
 
-> NOTA: L'estudi d'*outliers* en l'extrem superior es podria allargar força més considerant la consistència de registres en l'horitzó temporal, considerant la consistència de registres d'una mateixa marca en una zona pròxima ...
+> NOTA: L'estudi d'*outliers* en l'extrem superior es podria allargar força més considerant: la consistència de registres en l'horitzó temporal (diferents dates), considerant la consistència de registres d'una mateixa marca en una zona pròxima, ampliar l'estudi de consistencia a tots els productes de l'estació de servei...
 
 \vspace{10pt}
 **Valors extrems inferiors**
 
-Observant el *violin plot* anterior per al combustible *Gasóleo A habitual*, crida l'atenció la concentració de mostres al voltant del preu 1.5€/l, import que es considera "extrem". Així doncs, es seleccionen els valors en aquest rang per estudiar-los amb més profunditat, obtenint el nombre de registres d'aquestes característiques per província.
+Observant el *violin plot* anterior per al combustible *Gasóleo A habitual*, crida l'atenció la concentració de mostres al voltant del preu 1.5€/l, import que es considera "extrem". Així doncs, es seleccionen els valors d'aquest combustible i en aquest rang per estudiar-los amb més profunditat, obtenint el nombre de registres d'aquestes característiques per província.
 
 ```{r Low_analysis, vspaceecho='10pt'}
 #Selecció de registres en la zona objectiu i summarització
@@ -536,7 +541,7 @@ DiesConc<-data[data$Fuel_type =="Gasóleo A habitual" &
 kable(DiesConc)
 ```
 
-On s'observa que els registres obtinguts pertanyen tots a províncies amb tipus impositius especials. Això indica, que per tal de fer un estudi coherent del preu dels combustibles s'hauran de considerar els registres de les estacions de servei peninsulars de manera separada dels registres insulars i de ciutats autònomes.
+La taula anterior mostra que els registres obtinguts pertanyen tots a províncies amb tipus impositius especials. Això indica, que per tal de fer un estudi coherent del preu dels combustibles s'hauran de considerar els registres de les estacions de servei peninsulars de manera separada dels registres insulars i de ciutats autònomes, doncs la diferencia d'impostos, comporta variacions significatives en el preu dels combustibles.
 
 ```{r peninsula_selection, vspaceecho='10pt'}
 #Selecció dades peninsulars
@@ -544,7 +549,7 @@ non_peninsula=c("CEUTA", "MELILLA", "PALMAS, LAS", "SANTA CRUZ DE TENERIFE")
 data.peninsula<-data[!(data$Province %in% non_peninsula), ]
 ```
 
-Graficant les dades peninsulars (un cop extretes les dades de les ciutats autònomes de Ceuta i Melilla, així com les dades de les provinicies de les illes canàries) s'observa una clara reducció en el nombre de valors extrems. 
+Un cop extretes les dades de les ciutats autònomes de Ceuta i Melilla, així com les dades de les provinicies de les illes canàries, es grafiquen les dades peninsulars on s'observa una clara reducció en el nombre de valors extrems. 
 
 ```{r fuel_price_peninsula, echo=FALSE, fig.height=5, warning=FALSE}
 g2<-ggplot(data=data.peninsula, aes(x=Fuel_type, y=Price, color=Fuel_type)) +
@@ -556,7 +561,7 @@ g2<-ggplot(data=data.peninsula, aes(x=Fuel_type, y=Price, color=Fuel_type)) +
 g2
 ```
 
-Per finalitzar l'anàlisi dels valors extrems inferiors, es procedeix d'acord al mètode de selecció utilitzat prèviament en els valors extrems superiors. Així doncs, s'obtenen els registres que són valors extrems inferiors tant pel cas del combustible *Gasóleo A habitual* com pel *Gasolina 95 E5*.
+Per tal de seleccionar els valors extrems inferiors, es procedeix d'acord al mètode utilitzat prèviament en els valors extrems superiors. Així doncs, s'obtenen els registres que són valors extrems inferiors tant pel cas del combustible *Gasóleo A habitual* com pel *Gasolina 95 E5*.
 
 ```{r extreme_values_low_selection, vspaceecho='10pt'}
 #Valors extrems superiors Gasóleo A habitual
@@ -574,7 +579,7 @@ GasLow<-data.peninsula[data.peninsula$Fuel_type =="Gasolina 95 E5" &
   as.data.frame()
 ```
 
-En aquest cas, es vol saber si els registres seleccionats com a valors extrems provenen d'estacions de servei d'una marca entre les 10 més representatives o formen part del grup "OTROS" que inclou estacions de servei de baix cost.
+L'existència d'estacions de servei *low cost* pot explicar l'aparició de valors extrems inferiors, coherents, en la variable *price*. Així doncs, es interessant saber si els registres seleccionats provenen d'estacions de servei d'una marca entre les 10 més representatives o formen part del grup "OTROS" que inclou aquest tipus d'estacions de servei de baix cost.
 \newpage
 
 ```{r low_extreme_deep_analysis_1, vspaceecho='10pt'}
@@ -586,7 +591,7 @@ rownames(stt)<-c("Gasóleo A habitual","Gasolina 95 E5")
 kable(t(stt))
 ```
 
-En vista dels resultats, i buscant elements erronis o poc coherents, interessa analitzar amb més detall els registres d'estacions de servei **no** *lowcost* amb algun registre per tractar-se de registres candidats a erronis.
+En vista dels resultats, interessa analitzar amb més detall els registres de valors extrems inferiors obtinguts per estacions de servei **no** *lowcost*, per tractar-se de registres candidats a erronis.
 
 ```{r , vspaceecho='10pt'}
 #Anàlisis pel combustible Gasóleo A habitual
@@ -597,7 +602,7 @@ Diesel<-data.peninsula[data.peninsula$Fuel_type=="Gasóleo A habitual" &
                         data.peninsula$Brand.factor=="SHELL"),]
 ```
 
-Graficant la distribució de la variable price, es considera el valor extrem de la marca **BP** (marcat amb un triangle negre en el gràfic) poc consistent i per tant erroni, mentre que pel valor extrem de la marca **SHELL** es considera que no hi ha prou evidència per a decidir si el valor es erroni i per tant es manté (marcat amb un triangle del mateix color que el gràfic).
+Graficant la distribució de la variable *price*, es considera el valor extrem de la marca **BP** (marcat amb un triangle negre en el gràfic) poc consistent, per altra banda, es considera que no hi ha prou evidència per decidir si el valor extrem de la marca **SHELL** és erroni i per tant es manté (marcat amb un triangle del mateix color que el gràfic).
 
 ```{r, echo=FALSE, fig.height=5, warning=FALSE}
 g3<-ggplot(data=Diesel, aes(x=Brand.factor, y=Price, color=Brand.factor)) +
@@ -612,14 +617,14 @@ g3<-ggplot(data=Diesel, aes(x=Brand.factor, y=Price, color=Brand.factor)) +
 g3
 ```
 
-El registre es guarda per a una posterior extracció.
+El registre anteriorment esmentat es guarda per a una posterior extracció del *dataset*.
 
 ```{r, vspaceecho='10pt'}
 #Element poc consistent a extreure
 to_remove_1<-DiesLow[DiesLow$Brand.factor=="BP",]
 ```
 
-Es continua amb l'estudi pel combustible Gasolina 95 E5
+Finalitzat l'anàlisi per al combustible *Gasóleo A habitual*, es continua amb l'estudi pel combustible *Gasolina 95 E5*.
 
 ```{r, vspaceecho='10pt'}
 #Anàlisis pel combustible Gasolina 95 E5
@@ -650,13 +655,12 @@ g4<-ggplot(data=Gasolina, aes(x=Brand.factor, y=Price, color=Brand.factor)) +
 g4
 ```
 
+Analitzant els resultats, visualment es consideren valors poc consistents:
 
-A la vista dels resultats, es consideren valors poc consistents:
+* El valor extrem inferior per la marca **CEPSA** (marcat amb un triangle negre).
+* El valor extrem mínim per la marca **SHELL** (marcat amb un triangle negre).
 
-* Valor extrem inferior per la marca **CEPSA** (marcat amb un triangle negre).
-* Valor extrem mínim per la marca **SHELL** (marcat amb un triangle negre).
-
-I es procedeix a eliminar els valors que es consideren poc consistents.
+Conseqüentment es seleccionen els valors poc consistents i es procedeix a la seva eliminació.
 
 ```{r, vspaceecho='10pt'}
 #Elements poc consistents
@@ -673,7 +677,7 @@ data.peninsula<-anti_join(data.peninsula,to_remove,
 ```
 
 \newpage
-Finalment es genera l'arxiu *clean_dataset.csv* que conté les dades finals, posteriors a la integració, selecció i neteja de dades.
+Finalment es genera l'arxiu *clean_dataset.csv* que conté les dades finals, després dels processos d'integració, selecció i neteja de dades.
 
 ```{r, vspaceecho='10pt'}
 #Exportar a csv
@@ -868,3 +872,4 @@ file<-file.path(folder, "contribucions.PNG")
 knitr::include_graphics(file)
 ```
 
+XV - version check
