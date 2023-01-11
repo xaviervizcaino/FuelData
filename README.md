@@ -1,4 +1,3 @@
-[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC_BY--NC_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 ## FuelData
 
 ### What's FuelData
@@ -32,4 +31,4 @@ Just open *Practica_2.Rmd* file from **/code** folder with RStudio & **knit** it
 - [x] **dataset/pobnum/pobnum22.csv**: dataset from INE (Instituto Nacional de Estadística) with population number for each town or city.
 
 ### License
-Project shared with conditions specified by   [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC_BY--NC_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC_BY--NC_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
