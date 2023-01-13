@@ -723,7 +723,7 @@ ad.test(total[total$Fuel_type=="Gasóleo A habitual", "Price"])
 ad.test(total[total$Fuel_type=="Gasolina 95 E5", "Price"])
 ```
 
-Valorant el p-valor obtingut, aquest és molt inferior al nivell de significació (0.05) i per tant es concloure que les dades **no** segueixen una distribució normal. Per tant, es crea una nova variable amb els nom *pnorm* amb les dades modificades segons la transformació de BoxCox i s'executa novament el test de normalitat.
+Valorant el p-valor obtingut, aquest és molt inferior al nivell de significació (0.05) i per tant es concloure que les dades **no** segueixen una distribució normal. Per tant, es crea una nova variable amb el nom *pnorm* amb les dades modificades segons la transformació de BoxCox i s'executa novament el test de normalitat.
 
 ```{r, vspaceecho='10pt'}
 #Transformacions de BoxCox
@@ -744,7 +744,7 @@ Donat que les dades de la variable *Price* no segueixen una distribució normal 
 
 ### Aplicació de proves estadístiques per comparar els grups de dades
 
-En primer lloc, es realitza un test per comprovar la diferència de mitjanes entre les ciutats de Barcelona i Madrid. Filtrant les dades será possible analitzar si hi ha diferències entre les ciutats per cada tipus de carburant.
+En primer lloc, es realitza un test per comprovar la diferència de mitjanes entre les ciutats de Barcelona i Madrid. Filtrant les dades serà possible analitzar si hi ha diferències entre les ciutats per cada tipus de carburant.
 
 ```{r price_BCN_vs_MAD, vspaceecho='10pt'}
 #Anàlisis pel carburant Gasóleo A habitual
@@ -760,7 +760,7 @@ wilcox.test(Price ~ City, data = capital_filter2, na.rm=TRUE, paired=FALSE,
             exact=FALSE, conf.int=TRUE)
 ```
 
-En ambdos tests el p-value obtingut és inferior al nivell de significació, així doncs es pot concloure que les diferències de preu entre les dues capitals són significatives pels dos combustibles.
+En ambdós tests el p-value obtingut és inferior al nivell de significació, així doncs es pot concloure que les diferències de preu entre les dues capitals són significatives pels dos combustibles.
 
 A continuació s'estudia si hi ha diferències significatives entre la mitjana de preus dels dos combustibles en funció del nombre d'habitants del municipi.
 \newpage
@@ -802,20 +802,22 @@ Novament, s'obté un p-valor inferior a 0,05 que permet concloure que la dimensi
 A continuació es mostra un Box-Plot per visualitzar gràficament aquestes diferències.
 
 ```{r, vspaceecho='10pt'}
-boxplot(Price ~ Pop_size, data = pop_filter_fuel, main = "BoxPlot Gasóleo A habitual",
+boxplot(Price ~ Pop_size, data = pop_filter_fuel, main = "BoxPlot Gasolina 95 E5",
         xlab = "Mida del municipi", ylab = "Preu")
 
 ```
 
 \newpage
-Els resultats d'aquest primer anàlisi mostren que:
+Els resultats d'aquests primers anàlisis mostren que:
 
 * De mitjana, el *Gasóleo A habitual* és més car que la *Gasolina 95 E5*.
 * El *Gasóleo A habitual* és més barat a Barcelona que a Madrid, en canvi la *Gasolina 95 E5* es més barata a Madrid que a Barcelona.
-* La dimensió del municipi (petit, mitjà o gran) té una influencia estadisticament significativa en el preu dels dos combustibles en estudi.
+* La mida del municipi (petit, mitjà o gran) té una influencia estadisticament significativa en el preu dels dos combustibles en estudi.
 
-A continuació es vol estudiar si el nombre d'estacions de servei en el municipi té algun tipus d'influència en els preus del combustible.
 
+
+A continuació es vol estudiar si els preus del combustible estan correlacionats amb el nombre d'estacions de servei per municipi.
+El primer pas és la creació d'una sèrie de df i grups de dades que ens ajuden en l'anàlisi.
 ```{r, vspaceecho='10pt'}
 #Data subset
 gasoil <- subset(total, Fuel_type == "Gasóleo A habitual")
@@ -831,7 +833,7 @@ gasolina_frequency <- table(gasolina$City)
 gasolina_frequency <- as.data.frame(gasolina_frequency)
 ```
 
-A continuació s'analitza si existeix relació entre el preu mitja del combustible de cada municipi i el nombre d'estacions de servei en aquell mateix municipi.
+Seguidament durem a terme una regressió lineal per analitzar la relació.
 
 ```{r, vspaceecho='10pt'}
 #Data management
@@ -861,8 +863,16 @@ plot(resultg$Meanp, resultg$Freq, main = "Gasolina 95 E5", xlab = "Price", ylab 
 ```
 
 En ambdos casos s'observa que no existeix una relació lineal entre el preu del combustible i el nombre d'estacions de servei en el municipi.
+
+```{r}
+gasolinab$Brand_num <- as.numeric(gasolinab$Brand)
+cor.test(gasolinab$Price, gasolinab$Brand_num, method = "spearman")
+```
+
+
+
 \newpage
-Per finalitzar, es vol estudiar si hi ha diferencies estadísticament significatives en el preu dels combustibles en funció de la marca de l'estació de servei.
+Per finalitzar, es vol estudiar si hi ha diferències estadísticament significatives en el preu dels combustibles en funció de la marca de l'estació de servei.
 
 ```{r, vspaceecho='10pt'}
 #Gasóleo A habitual
@@ -875,6 +885,8 @@ kruskal.test(Price ~ Brand.factor, data = gasolinab)
 ```
 
 Com que en ambdos casos obtenim p-valors menors que el nivell de significació (0.05), es pot concloure que hi ha, com a mínim, un grup (marca d'estació de servei) estadísticament diferent dels altres grups en per cada combustible.
+
+
 
 A continuació es presenta un histograma amb l'objectiu de coneixer la distribució de preus d'aquest darrer anàlisi.
 
